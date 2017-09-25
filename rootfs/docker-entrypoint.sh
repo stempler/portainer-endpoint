@@ -32,23 +32,27 @@ fi
 
 # Get Portainer JWT
 #jwt=$(http POST "${PORTAINER_ADDR}/api/auth" Username="${PORTAINER_USER}" Password="${PORTAINER_PASS}" | jq -r .jwt)
-jwt=$(curl -sf -X POST -H "Accept: application/json, */*" -H "Content-Type: application/json" --data "{\"Username\": \"${PORTAINER_USER}\", \"Password\": \"${PORTAINER_PASS}\"}" "${PORTAINER_ADDR}/api/auth"  | jq -r .jwt)
+jwt_tmp=$(curl -sS -k -X POST -H "Accept: application/json, */*" -H "Content-Type: application/json" --data "{\"Username\": \"${PORTAINER_USER}\", \"Password\": \"${PORTAINER_PASS}\"}" "${PORTAINER_ADDR}/api/auth")
+# DEBUG echo $jwt_tmp
+jwt=$(echo $jwt_tmp | jq -r .jwt)
+# DEBUG echo $jwt
 
 [ -z "$jwt" ] && echo "Can't connect or login with Portainer" && exit 1
 
 # Check if the host is already registered
 # registered_hosts=$(http --auth-type=jwt --auth="${jwt}" ${PORTAINER_ADDR}/api/endpoints | jq --arg HOST "$host_hostname" -c '.[] | select(.Name == $HOST) | .Id')
-registered_hosts=$(curl -sf -X GET -H "Accept: application/json, */*" -H "Content-Type: application/json" -H "Authorization: Bearer ${jwt}" ${PORTAINER_ADDR}/api/endpoints | jq --arg HOST "$host_hostname" -c '.[] | select(.Name == $HOST) | .Id')
+hosts_tmp=$(curl -sf -k -X GET -H "Accept: application/json, */*" -H "Content-Type: application/json" -H "Authorization: Bearer ${jwt}" ${PORTAINER_ADDR}/api/endpoints)
+# DEBUG echo $hosts_tmp
+registered_hosts=$(echo "$hosts_tmp" | jq --arg HOST "$host_hostname" -c '.[] | select(.Name == $HOST) | .Id')
 for i in $registered_hosts
 do
   echo Deleting previous found host name with id $i
   # http --auth-type=jwt --auth="${jwt}" DELETE ${PORTAINER_ADDR}/api/endpoints/$i
-  curl -sf -X DELETE -H "Accept: application/json, */*" -H "Content-Type: application/json" -H "Authorization: Bearer ${jwt}" ${PORTAINER_ADDR}/api/endpoints/${i}
+  curl -sf -k -X DELETE -H "Accept: application/json, */*" -H "Content-Type: application/json" -H "Authorization: Bearer ${jwt}" ${PORTAINER_ADDR}/api/endpoints/${i}
 done
 
 # Register current host
 # http --auth-type=jwt --auth="${jwt}" POST ${PORTAINER_ADDR}/api/endpoints Name="${host_hostname}-endpoint" URL="tcp://${HOSTNAME}:2375"
-curl -sf -X POST -H "Accept: application/json, */*" -H "Content-Type: application/json" -H "Authorization: Bearer ${jwt}" --data "{\"Name\": \"${host_hostname}\", \"URL\": \"tcp://${HOSTNAME}:2375\"}" ${PORTAINER_ADDR}/api/endpoints
+curl -sf -k -X POST -H "Accept: application/json, */*" -H "Content-Type: application/json" -H "Authorization: Bearer ${jwt}" --data "{\"Name\": \"${host_hostname}\", \"URL\": \"tcp://${HOSTNAME}:2375\"}" ${PORTAINER_ADDR}/api/endpoints
 
 exec "$@"
-
